@@ -59,13 +59,13 @@ python manage.py migrate
 python manage.py runserver
 ```
 
-###📡3. Start Redis Server
+### 📡3. Start Redis Server
 ```bash
 # On Ubuntu/macOS
 redis-server
 ```
 
-###🌐 3. Frontend Setup
+### 🌐 3. Frontend Setup
 
 ```bash
 cd frontend
