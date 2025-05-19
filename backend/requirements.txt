@@ -24,8 +24,10 @@ pycparser==2.22
 PyJWT==2.9.0
 pyOpenSSL==25.1.0
 redis==6.1.0
+rest-framework-simplejwt==0.0.2
 service-identity==24.2.0
 sqlparse==0.5.3
+tomli==2.2.1
 Twisted==24.11.0
 txaio==23.1.1
 typing_extensions==4.13.2

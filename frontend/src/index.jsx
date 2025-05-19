@@ -9,7 +9,6 @@ import { NotificationsProvider } from "./auth/NotificationsContext"; // ✅ new
 // Entry point for React 18+ with Vite
 const container = document.getElementById("root");
 const root = createRoot(container);
-console.log("👋 index.jsx is running, container:", container);
 
 root.render(
   <React.StrictMode>

@@ -8,9 +8,14 @@ export default function ChatWindow({ contact }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [status, setStatus] = useState('connecting…');
-  const wsRef = useRef(null);
+  const wsRef = useRef(null);setStatus
   const reconnectTimer = useRef(null);
   const queueRef = useRef([]);
+  const myId = user.user_id;
+const otherId = contact.id;
+const roomName = `chat_${Math.min(myId, otherId)}_${Math.max(myId, otherId)}`;
+
+console.log("🚀 ~ ChatWindow ~ roomName:", roomName)
 
   useEffect(() => {
     setMessages([]);
@@ -18,9 +23,17 @@ export default function ChatWindow({ contact }) {
       .get(`chat/messages/${contact.id}/`, {
         headers: { Authorization: `Bearer ${authTokens.access}` },
       })
-      .then(res => setMessages(res.data.reverse()))
-      .catch(console.error);
+      .then(res => {
+        console.log("API Response:", res);
+        console.log("Messages:", res.data);
+        setMessages(res.data.reverse());
+      })
+      .catch(error => {
+        console.error("Error fetching messages:", error);
+      });
   }, [contact, authTokens]);
+
+    console.log("🚀 ~ ChatWindow ~ res.data:", messages)
 
   useEffect(() => {
     const connect = () => {
@@ -31,23 +44,34 @@ export default function ChatWindow({ contact }) {
       wsRef.current = socket;
 
       socket.onopen = () => {
-        console.log('✅ WebSocket connected');
+        console.log('WebSocket connected');
         setStatus('open');
         queueRef.current.forEach(msg => socket.send(msg));
         queueRef.current = [];
       };
       socket.onmessage = e => {
-        const msg = JSON.parse(e.data);
+  const msg = JSON.parse(e.data);
+  const senderId = msg.sender_id ?? (msg.sender?.id ?? null);
+  const receiverId = msg.receiver_id ?? (msg.receiver?.id ?? null);
 
-        setMessages(prev => {
-          const exists = prev.some(m => m.id === msg.id);
-          if (exists) {
-            console.warn("⚠️ Skipping duplicate", msg);
-            return prev;
-          }
-          return [...prev, msg];
-        });
-        };
+    setMessages(prev => {
+        if (msg.id && prev.some(m => m.id === msg.id)) return prev;
+
+        const isDuplicate = prev.some(
+          m =>
+            m.isTemp &&
+            m.text === msg.text &&
+            m.sender_id === senderId &&
+            Math.abs(new Date(m.timestamp) - new Date(msg.timestamp)) < 2000
+        );
+        if (isDuplicate) return prev;
+
+        return [...prev, msg];
+      });
+    };
+
+
+
 
 
       socket.onclose = e => {
@@ -57,7 +81,7 @@ export default function ChatWindow({ contact }) {
       };
 
       socket.onerror = e => {
-        console.error('❌ WebSocket error', e);
+        console.error('WebSocket error', e);
         socket.close();
       };
 
@@ -76,35 +100,38 @@ export default function ChatWindow({ contact }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-    const sendMessage = useCallback(() => {
-    const text = draft.trim();
-    if (!text) return;
-    const payload = { text, to: contact.id };
-    const sock = wsRef.current;
+const sendMessage = useCallback(() => {
+  const text = draft.trim();
+  if (!text) return;
 
-    if (sock?.readyState === WebSocket.OPEN) {
-      console.log('📤 Sending:', payload);
-      sock.send(JSON.stringify(payload));
+  const tempId = `temp-${Date.now()}`;
+  const payload = { text, to: contact.id };
 
-      // 💥 Manually add to messages for sender
-      const tempMsg = {
-        id: Date.now(), // temporary client-side ID to avoid deduping
-        text,
-        sender_id: user.user_id,
-        timestamp: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, tempMsg]);
-    } else {
-      queueRef.current.push(JSON.stringify(payload));
-    }
+  const socket = wsRef.current;
 
-    setDraft('');
-    }, [draft, contact, user.user_id]);
+  if (socket?.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify(payload));
+
+    const tempMsg = {
+      id: tempId,
+      text,
+      sender_id: user.user_id,
+      receiver_id: contact.id,
+      timestamp: new Date().toISOString(),
+      isTemp: true,
+    };
+
+    setMessages(prev => [...prev, tempMsg]);
+  } else {
+    queueRef.current.push(JSON.stringify(payload));
+  }
+
+  setDraft('');
+}, [draft, contact.id, user.user_id]);
 
 
   return (
     <div className="flex flex-col overflow-y-scroll [scrollbar-width:none] border-l">
-      {/* Status bar */}
       <div className="px-4 py-2 bg-gray-50 text-sm">
         Chat with <strong>{contact.username}</strong> —{' '}
         <span
@@ -125,7 +152,6 @@ export default function ChatWindow({ contact }) {
           {messages.map((m, i) => {
             const senderId = m.sender_id ?? (typeof m.sender === 'object' ? m.sender.id : m.sender);
             const isOwnMessage = senderId === user.user_id;
-
 
             return (
               <div
@@ -150,7 +176,6 @@ export default function ChatWindow({ contact }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div className="p-4 border-t flex items-center space-x-2 absolute bottom-0 right-0 w-full">
         <input
           type="text"
