@@ -74,7 +74,9 @@ npm run dev
 ```
 
 
+
 📣 Future Enhancements
+
   ✅ Group Chats
   
   ✅ Typing Indicators
